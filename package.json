@@ -1,0 +1,1 @@
+{"name":"congreso-feedback-panel","version":"1.0.0","private":true,"description":"Panel público y administración protegida del Congreso","main":"server.js","scripts":{"start":"node server.js"},"engines":{"node":">=20"},"dependencies":{"express":"^4.21.2","express-rate-limit":"^7.5.0","helmet":"^8.0.0"}}
