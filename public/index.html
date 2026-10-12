@@ -18,69 +18,35 @@
       <span id="connection" class="pill" role="status">Conectando…</span>
     </div>
   </header>
-
   <main class="wrap">
     <section class="intro">
       <p class="eyebrow">SEGUIMIENTO EN VIVO</p>
-      <h2>Lo que está pasando</h2>
-      <p class="muted">Una síntesis de los temas, preguntas y dificultades que aparecen durante el evento.</p>
-      <p id="updated" class="muted small">Esperando el primer informe…</p>
-    </section>
-
-    <section class="panel-section summary-section" aria-labelledby="summary-heading">
-      <div class="section-heading">
-        <span class="section-icon" aria-hidden="true">01</span>
-        <div>
-          <p class="eyebrow">VISIÓN GENERAL</p>
-          <h3 id="summary-heading">Resumen general</h3>
-        </div>
+      <h2>Historial de actualizaciones</h2>
+      <p class="muted">Los informes más recientes aparecen arriba. Las actualizaciones nuevas no interrumpen tu lectura: podés verlas cuando quieras.</p>
+      <div class="intro-meta">
+        <p id="updated" class="muted small">Esperando el primer informe…</p>
+        <a class="jump-link" href="#latest-report" id="latest-link">Ir al informe más reciente ↓</a>
       </div>
-      <div id="summary" class="markdown-body" aria-live="polite">El análisis todavía no publicó resultados.</div>
+      <p id="report-count" class="count-label">Todavía no hay informes guardados.</p>
     </section>
-
-    <section id="talk-section" class="panel-section talk-section" aria-labelledby="talk-heading" hidden>
-      <div class="section-heading">
-        <span class="section-icon" aria-hidden="true">02</span>
+    <section class="timeline-section" aria-labelledby="timeline-heading">
+      <div class="timeline-heading">
         <div>
-          <p class="eyebrow">CONTEXTO ACTUAL</p>
-          <h3 id="talk-heading">Charla actual</h3>
+          <p class="eyebrow">ORDEN CRONOLÓGICO</p>
+          <h3 id="timeline-heading">Informes del evento</h3>
         </div>
+        <span class="timeline-note">Más recientes primero</span>
       </div>
-      <h4 id="current-talk-title" class="talk-title"></h4>
-      <div id="talk-summary" class="markdown-body"></div>
-    </section>
-
-    <section class="panel-section analysis-section" aria-labelledby="analysis-heading">
-      <div class="section-heading">
-        <span class="section-icon" aria-hidden="true">03</span>
-        <div>
-          <p class="eyebrow">ÚLTIMA ACTUALIZACIÓN DEL ANÁLISIS</p>
-          <h3 id="analysis-heading">Análisis reciente</h3>
-        </div>
+      <div id="reports" class="reports" aria-live="off">
+        <div id="empty-state" class="empty-state">Esperando el primer análisis de Gemini…</div>
       </div>
-      <div id="recent-feedback" class="markdown-body" aria-live="polite">Esperando el primer informe…</div>
     </section>
-
-    <section id="structured-results" class="cards" aria-label="Indicadores del análisis" hidden>
-      <article class="card">
-        <h3>Temas principales</h3>
-        <ul id="topics"></ul>
-      </article>
-      <article class="card">
-        <h3>Preguntas frecuentes</h3>
-        <ul id="questions"></ul>
-      </article>
-      <article class="card">
-        <h3>Dificultades detectadas</h3>
-        <ul id="issues"></ul>
-      </article>
-    </section>
-
     <footer>
       <span>Actualización automática cada 2 minutos</span>
       <a href="/admin">Administración</a>
     </footer>
   </main>
+  <button id="new-updates" class="new-updates" type="button" hidden>Hay nuevas actualizaciones ↓</button>
   <script src="/app.js" defer></script>
 </body>
 </html>
