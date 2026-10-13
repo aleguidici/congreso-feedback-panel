@@ -156,8 +156,17 @@ function updateMeta(reports) {
   $("connection").textContent = hasRecentActivity ? "En vivo" : "Sin actividad reciente";
   $("connection").classList.toggle("is-live", hasRecentActivity);
 }
+function latestReportIsVisible() {
+  const latest = document.querySelector(".report-entry");
+  if (!latest) return false;
+  const rect = latest.getBoundingClientRect();
+  // Si el informe más reciente ya está dentro de la pantalla, el aviso sobra.
+  return rect.top < window.innerHeight && rect.bottom > 0;
+}
 function updateNewButton() {
   const button = $("new-updates");
+  // Al llegar visualmente al informe más reciente, damos por vistas las novedades.
+  if (pendingUpdates > 0 && latestReportIsVisible()) pendingUpdates = 0;
   button.hidden = pendingUpdates === 0;
   button.textContent = pendingUpdates === 1 ? "Hay una nueva actualización ↑" : `Hay ${pendingUpdates} nuevas actualizaciones ↑`;
 }
@@ -238,3 +247,6 @@ $("latest-link").addEventListener("click", event => {
 });
 refreshHistory();
 setInterval(refreshHistory, 10000);
+// Si el usuario llega al informe más reciente, ocultamos el botón flotante.
+window.addEventListener("scroll", updateNewButton, { passive: true });
+window.addEventListener("resize", updateNewButton);
