@@ -89,7 +89,10 @@ function formatDate(value) {
 }
 function getViewportAnchor() {
   const nodes = [...document.querySelectorAll(".report-entry")];
-  const anchor = nodes.find(node => node.getBoundingClientRect().bottom > 0);
+  const anchor = nodes.find(node => {
+    const rect = node.getBoundingClientRect();
+    return rect.bottom > 0 && rect.top < window.innerHeight;
+  });
   return anchor ? { node: anchor, top: anchor.getBoundingClientRect().top } : null;
 }
 function renderReport(report, openIt = false) {
@@ -148,17 +151,19 @@ function updateMeta(reports) {
   const latest = reports[reports.length - 1];
   $("updated").textContent = "Último informe recibido: " + formatDate(latest.updatedAt);
   $("report-count").textContent = reports.length + (reports.length === 1 ? " informe conservado" : " informes conservados") + ".";
-  $("connection").textContent = latest.status === "live" ? "En vivo" : "Panel conectado";
-  $("connection").classList.toggle("is-live", latest.status === "live");
+  const lastReportTime = Date.parse(latest.updatedAt);
+  const hasRecentActivity = Number.isFinite(lastReportTime) && (Date.now() - lastReportTime) < 5 * 60 * 1000;
+  $("connection").textContent = hasRecentActivity ? "En vivo" : "Sin actividad reciente";
+  $("connection").classList.toggle("is-live", hasRecentActivity);
 }
 function updateNewButton() {
   const button = $("new-updates");
   button.hidden = pendingUpdates === 0;
-  button.textContent = pendingUpdates === 1 ? "Hay una nueva actualización ↓" : `Hay ${pendingUpdates} nuevas actualizaciones ↓`;
+  button.textContent = pendingUpdates === 1 ? "Hay una nueva actualización ↑" : `Hay ${pendingUpdates} nuevas actualizaciones ↑`;
 }
 async function refreshHistory() {
   try {
-    const response = await fetch("/api/public-history", { cache: "no-store" });
+    const response = await fetch("/api/public-history?t=" + Date.now(), { cache: "no-store" });
     if (!response.ok) throw new Error("No se pudo cargar el historial");
     const data = await response.json();
     const reports = Array.isArray(data.reports) ? data.reports : [];
@@ -232,4 +237,4 @@ $("latest-link").addEventListener("click", event => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 refreshHistory();
-setInterval(refreshHistory, 120000);
+setInterval(refreshHistory, 10000);
