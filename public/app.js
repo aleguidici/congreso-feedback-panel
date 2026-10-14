@@ -454,7 +454,7 @@ $("new-updates").addEventListener("click", () => {
 });
 refreshHistory();
 refreshAudience();
-setInterval(refreshHistory, 10000);
+setInterval(refreshHistory, 60000);
 setInterval(refreshAudience, 60000);
 // Si el usuario llega al informe más reciente, ocultamos el botón flotante.
 window.addEventListener("scroll", updateNewButton, { passive: true });

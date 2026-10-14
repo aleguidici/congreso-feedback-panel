@@ -39,7 +39,7 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .brand-row { display: flex; justify-content: space-between; align-items: center; gap: 28px; min-height: 100px; }
 .guacurari-brand { display: inline-flex; align-items: center; flex: 0 1 245px; min-width: 150px; }
 .guacurari-logo { display: block; width: 100%; max-width: 245px; height: auto; }
-.congreso-logo { display: block; width: min(58%, 530px); max-height: 220px; object-fit: contain; object-position: right center; }
+.congreso-logo { display: block; width: min(58%, 400px); max-height: 160px; margin: 20px 0 24px; object-fit: contain; object-position: right center; }
 .header-bottom { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-top: 18px; border-top: 1px solid rgb(255 255 255 / 8%); }
 .top h1 { margin: 5px 0 0; font-size: clamp(1.65rem, 4vw, 2.35rem); letter-spacing: -.04em; }
 .header-subtitle { margin: 7px 0 0; color: #b8b4cc; font-size: .98rem; }
@@ -150,7 +150,7 @@ a:hover { color: #f0abfc; }
   .feature, .login-box { padding: 18px; }
   .brand-row { align-items: flex-start; gap: 16px; min-height: 0; }
   .guacurari-brand { flex-basis: 125px; min-width: 90px; padding-top: 7px; }
-  .congreso-logo { width: min(68%, 340px); max-height: 190px; }
+  .congreso-logo { width: min(68%, 260px); max-height: 120px; margin: 14px 0 18px; }
   .header-bottom { align-items: flex-start; flex-direction: column; margin-top: 18px; }
   .pill { align-self: flex-start; }
   .intro { padding-top: 26px; }
