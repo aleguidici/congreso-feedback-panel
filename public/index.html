@@ -3,31 +3,52 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#14243a">
-  <title>Estadísticas del Congreso</title>
-  <link rel="stylesheet" href="/style.css?v=7">
+  <meta name="theme-color" content="#0b0b12">
+  <meta name="color-scheme" content="dark">
+  <title>Seguimiento en vivo · Congreso Flipped Learning</title>
+  <link rel="stylesheet" href="/style.css?v=8">
 </head>
 <body>
   <header class="top">
-    <div class="wrap top-inner">
-      <div>
-        <p class="eyebrow">CONGRESO INTERNACIONAL</p>
-        <h1>Flipped Learning</h1>
-        <p class="header-subtitle">Síntesis de la conversación y la transmisión</p>
+    <div class="wrap">
+      <div class="brand-row">
+        <a class="guacurari-brand" href="/" aria-label="Guacurarí, inicio">
+          <img src="/assets/logo-guacurari.svg" alt="10 Guacurarí" class="guacurari-logo">
+        </a>
+        <img src="/assets/logo-congreso.png" alt="9° Congreso Internacional de Flipped Learning: Pensamiento profundo, el desafío de enseñar cuando la IA responde" class="congreso-logo">
       </div>
-      <span id="connection" class="pill" role="status">Conectando…</span>
+      <div class="header-bottom">
+        <div>
+          <p class="eyebrow">SEGUIMIENTO EN VIVO</p>
+          <h1>Panel de seguimiento</h1>
+          <p class="header-subtitle">Síntesis de la conversación y la transmisión</p>
+        </div>
+        <span id="connection" class="pill" role="status">Conectando…</span>
+      </div>
     </div>
   </header>
   <main class="wrap">
     <section class="intro">
-      <p class="eyebrow">SEGUIMIENTO EN VIVO</p>
-      <h2>Historial de actualizaciones</h2>
-      <p class="muted">Los informes más recientes aparecen arriba. Las actualizaciones nuevas no interrumpen tu lectura: podés verlas cuando quieras.</p>
-      <div class="intro-meta">
-        <p id="updated" class="muted small">Esperando el primer informe…</p>
+      <div class="intro-heading">
+        <div>
+          <p class="eyebrow">MONITOREO DEL EVENTO</p>
+          <h2>Informes y participación</h2>
+          <p class="muted">Los informes más recientes aparecen arriba. Las actualizaciones nuevas no interrumpen tu lectura: podés verlas cuando quieras.</p>
+        </div>
         <a class="jump-link" href="#latest-report" id="latest-link">Ir al informe más reciente ↓</a>
       </div>
-      <p id="report-count" class="count-label">Todavía no hay informes guardados.</p>
+      <div class="global-stat-card" aria-live="polite">
+        <div class="global-stat-icon" aria-hidden="true">✦</div>
+        <div class="global-stat-copy">
+          <span class="global-stat-label">Mensajes en la totalidad del congreso</span>
+          <span id="congress-messages-count" class="global-stat-number">—</span>
+          <span class="global-stat-note">Total acumulado de mensajes registrados en la transmisión oficial.</span>
+        </div>
+      </div>
+      <div class="intro-meta">
+        <p id="updated" class="muted small">Esperando el primer informe…</p>
+        <p id="report-count" class="count-label">Todavía no hay informes guardados.</p>
+      </div>
     </section>
     <section class="audience-section" aria-labelledby="audience-heading">
       <div class="timeline-heading">
@@ -37,8 +58,9 @@
         </div>
         <span id="audience-updated" class="timeline-note">Sin muestras todavía</span>
       </div>
-      <p class="muted audience-note">Muestras cada 5 minutos cuando YouTube informa el dato. Son espectadores simultáneos de la transmisión, no personas únicas por charla. La tabla ubica las muestras según el horario previsto del programa.</p>
+      <p class="muted audience-note">Muestras cada 5 minutos cuando YouTube informa el dato. Son espectadores simultáneos de la transmisión, no personas únicas por charla. Pasá el cursor o tocá un punto para consultar la cifra y la hora exactas.</p>
       <div id="audience-chart" class="audience-chart"><p class="empty-state">Esperando la primera muestra de audiencia…</p></div>
+      <div id="audience-point-detail" class="audience-point-detail" aria-live="polite">Cuando haya muestras, seleccioná un punto del gráfico para ver el detalle.</div>
       <div id="audience-agenda" class="audience-agenda"><p class="empty-state">La agenda aparecerá cuando se active el video oficial del congreso.</p></div>
     </section>
     <section class="timeline-section" aria-labelledby="timeline-heading">
@@ -59,6 +81,6 @@
     </footer>
   </main>
   <button id="new-updates" class="new-updates" type="button" hidden>Hay nuevas actualizaciones ↓</button>
-  <script src="/app.js?v=7" defer></script>
+  <script src="/app.js?v=8" defer></script>
 </body>
 </html>

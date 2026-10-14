@@ -126,19 +126,12 @@ function addKeyPhrases(container, phrases) {
 }
 function addReportStats(container, report) {
   const stats = document.createElement("div"); stats.className = "report-stats";
-  const values = [
-    ["Mensajes de esta charla", report.talkMessageCount],
-    ["Mensajes de todo el video", report.eventMessageCount],
-    ["Ruido en esta charla", report.irrelevantMessages],
-    ["Ruido acumulado del evento", report.eventIrrelevantMessages]
-  ];
-  values.forEach(([label, value]) => {
-    const item = document.createElement("div"); item.className = "report-stat";
-    const name = document.createElement("span"); name.textContent = label;
-    const number = document.createElement("strong"); number.textContent = Number.isFinite(Number(value)) ? Number(value).toLocaleString("es-AR") : "—";
-    item.append(name, number); stats.append(item);
-  });
-  container.append(stats);
+  const item = document.createElement("div"); item.className = "report-stat";
+  const name = document.createElement("span"); name.textContent = "Mensajes acumulados de esta charla";
+  const number = document.createElement("strong");
+  number.textContent = Number.isFinite(Number(report.talkMessageCount)) ? Number(report.talkMessageCount).toLocaleString("es-AR") : "—";
+  const note = document.createElement("small"); note.textContent = "Desde el inicio identificado de la charla; no solo los últimos 15 minutos.";
+  item.append(name, number, note); stats.append(item); container.append(stats);
 }
 
 function formatDate(value) {
@@ -214,12 +207,17 @@ function renderReport(report, openIt = false) {
   return article;
 }
 function updateMeta(reports, status) {
+  const latest = reports.length ? reports[reports.length - 1] : null;
+  const globalCount = $("congress-messages-count");
+  if (globalCount) {
+    const count = latest && Number.isFinite(Number(latest.eventMessageCount)) ? Number(latest.eventMessageCount) : null;
+    globalCount.textContent = count === null ? "—" : count.toLocaleString("es-AR");
+  }
   if (!reports.length) {
     $("updated").textContent = status === "running" ? "Ejecución iniciada; esperando el primer informe…" :
       status === "stopped" ? "Ejecución detenida." : "Esperando el primer informe…";
     $("report-count").textContent = "Todavía no hay informes guardados para este video.";
   } else {
-    const latest = reports[reports.length - 1];
     $("updated").textContent = "Último informe recibido: " + formatDate(latest.updatedAt);
     $("report-count").textContent = reports.length + (reports.length === 1 ? " informe conservado" : " informes conservados") + ".";
   }
@@ -227,6 +225,7 @@ function updateMeta(reports, status) {
   $("connection").textContent = labels[status] || "Estado desconocido";
   $("connection").classList.toggle("is-live", status === "running");
 }
+
 function latestReportIsVisible() {
   const latest = document.querySelector(".report-entry");
   if (!latest) return false;
@@ -258,6 +257,18 @@ function shortTime(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString("es-AR", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit" });
 }
+function showAudiencePoint(item) {
+  const detail = $("audience-point-detail");
+  if (!detail || !item) return;
+  detail.replaceChildren();
+  const label = document.createElement("span"); label.className = "point-detail-label"; label.textContent = "Muestra seleccionada";
+  const count = document.createElement("strong");
+  count.textContent = Number.isInteger(item.viewers) ? `${item.viewers.toLocaleString("es-AR")} espectadores simultáneos` : "Dato de espectadores no disponible";
+  const time = document.createElement("span"); time.className = "point-detail-time";
+  time.textContent = new Date(item.timestamp).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "medium", timeZone: "Europe/Rome" }) + " (hora de Italia)";
+  detail.append(label, count, time);
+}
+
 function renderAudience(data) {
   const chart = $("audience-chart"), table = $("audience-agenda");
   chart.replaceChildren(); table.replaceChildren();
@@ -277,19 +288,31 @@ function renderAudience(data) {
     const svg = svgNode("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Evolución de espectadores simultáneos cada 5 minutos" });
     [0, max / 2, max].forEach(value => {
       const yy = y(value);
-      svg.append(svgNode("line", { x1: left, y1: yy, x2: width-right, y2: yy, stroke: "#dbe4ef", "stroke-width": 1 }));
-      const label = svgNode("text", { x: left-9, y: yy+4, "text-anchor": "end", fill: "#718096", "font-size": 11 });
+      svg.append(svgNode("line", { x1: left, y1: yy, x2: width-right, y2: yy, stroke: "#303044", "stroke-width": 1 }));
+      const label = svgNode("text", { x: left-9, y: yy+4, "text-anchor": "end", fill: "#a5a5bd", "font-size": 11 });
       label.textContent = Math.round(value).toLocaleString("es-AR"); svg.append(label);
     });
     const points = valid.map((item, index) => `${x(index)},${y(item.viewers)}`).join(" ");
-    svg.append(svgNode("polyline", { points, fill: "none", stroke: "#356da8", "stroke-width": 3, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    svg.append(svgNode("polyline", { points, fill: "none", stroke: "#8b5cf6", "stroke-width": 3, "stroke-linejoin": "round", "stroke-linecap": "round" }));
     valid.forEach((item, index) => {
-      const circle = svgNode("circle", { cx: x(index), cy: y(item.viewers), r: 4, fill: "#356da8" });
+      const circle = svgNode("circle", {
+        cx: x(index), cy: y(item.viewers), r: 6, fill: "#ec4899", stroke: "#0b0b12", "stroke-width": 2,
+        tabindex: 0, role: "button", "aria-label": `${shortTime(item.timestamp)}: ${item.viewers.toLocaleString("es-AR")} espectadores simultáneos`,
+        class: "audience-point"
+      });
       const title = svgNode("title"); title.textContent = `${shortTime(item.timestamp)} · ${item.viewers.toLocaleString("es-AR")} espectadores`;
-      circle.append(title); svg.append(circle);
+      circle.append(title);
+      circle.addEventListener("mouseenter", () => showAudiencePoint(item));
+      circle.addEventListener("focus", () => showAudiencePoint(item));
+      circle.addEventListener("click", () => showAudiencePoint(item));
+      circle.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); showAudiencePoint(item); }
+      });
+      svg.append(circle);
     });
-    const start = svgNode("text", { x: left, y: height-9, fill: "#718096", "font-size": 11 }); start.textContent = shortTime(valid[0].timestamp); svg.append(start);
-    const end = svgNode("text", { x: width-right, y: height-9, "text-anchor": "end", fill: "#718096", "font-size": 11 }); end.textContent = shortTime(valid[valid.length-1].timestamp); svg.append(end);
+    showAudiencePoint(valid[valid.length - 1]);
+    const start = svgNode("text", { x: left, y: height-9, fill: "#a5a5bd", "font-size": 11 }); start.textContent = shortTime(valid[0].timestamp); svg.append(start);
+    const end = svgNode("text", { x: width-right, y: height-9, "text-anchor": "end", fill: "#a5a5bd", "font-size": 11 }); end.textContent = shortTime(valid[valid.length-1].timestamp); svg.append(end);
     chart.append(svg);
   }
 
