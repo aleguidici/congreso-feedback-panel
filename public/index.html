@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#14243a">
   <title>Estadísticas del Congreso</title>
-  <link rel="stylesheet" href="/style.css?v=5">
+  <link rel="stylesheet" href="/style.css?v=7">
 </head>
 <body>
   <header class="top">
@@ -29,6 +29,18 @@
       </div>
       <p id="report-count" class="count-label">Todavía no hay informes guardados.</p>
     </section>
+    <section class="audience-section" aria-labelledby="audience-heading">
+      <div class="timeline-heading">
+        <div>
+          <p class="eyebrow">ASISTENCIA EN VIVO</p>
+          <h3 id="audience-heading">Espectadores simultáneos</h3>
+        </div>
+        <span id="audience-updated" class="timeline-note">Sin muestras todavía</span>
+      </div>
+      <p class="muted audience-note">Muestras cada 15 minutos cuando YouTube informa el dato. Son espectadores simultáneos de la transmisión, no personas únicas por charla. La tabla ubica las muestras según el horario previsto del programa.</p>
+      <div id="audience-chart" class="audience-chart"><p class="empty-state">Esperando la primera muestra de audiencia…</p></div>
+      <div id="audience-agenda" class="audience-agenda"><p class="empty-state">La agenda aparecerá cuando se active el video oficial del congreso.</p></div>
+    </section>
     <section class="timeline-section" aria-labelledby="timeline-heading">
       <div class="timeline-heading">
         <div>
@@ -47,6 +59,6 @@
     </footer>
   </main>
   <button id="new-updates" class="new-updates" type="button" hidden>Hay nuevas actualizaciones ↓</button>
-  <script src="/app.js?v=6" defer></script>
+  <script src="/app.js?v=7" defer></script>
 </body>
 </html>

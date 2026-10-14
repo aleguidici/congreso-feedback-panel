@@ -3,7 +3,7 @@ const app=express(); app.disable("x-powered-by");
 app.use(helmet({contentSecurityPolicy:{directives:{defaultSrc:["'self'"],scriptSrc:["'self'"],styleSrc:["'self'"],imgSrc:["'self'","data:"],connectSrc:["'self'"],objectSrc:["'none'"],upgradeInsecureRequests:null}}}));
 app.use(express.json({limit:"30kb"}));
 const PORT=Number(process.env.PORT||3000), USER=process.env.PANEL_USERNAME||"", PASS=process.env.PANEL_PASSWORD||"", SECRET=process.env.SESSION_SECRET||"", PUBLISH_TOKEN=process.env.PANEL_PUBLISH_TOKEN||"";
-const DATA=path.join(__dirname,"data","summary.json"), HISTORY=path.join(__dirname,"data","history.json"), sessions=new Map(), attempts=new Map();
+const DATA=path.join(__dirname,"data","summary.json"), HISTORY=path.join(__dirname,"data","history.json"), AUDIENCE=path.join(__dirname,"data","audience.json"), sessions=new Map(), attempts=new Map();
 if(!USER||!PASS||!SECRET||!PUBLISH_TOKEN){console.error("Faltan PANEL_USERNAME, PANEL_PASSWORD, SESSION_SECRET y PANEL_PUBLISH_TOKEN en las variables de entorno.");process.exit(1)}
 if(PASS.length<14||SECRET.length<32){console.error("PANEL_PASSWORD debe tener al menos 14 caracteres y SESSION_SECRET al menos 32.");process.exit(1)}
 const limiter=rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:"draft-7",legacyHeaders:false,message:{error:"Demasiados intentos. Esperá 15 minutos."}});app.use("/api/login",limiter);
@@ -45,7 +45,9 @@ function emptyVideoSummary(videoId, status = "running") {
   return {
     updatedAt: null, status, videoId, startedAt: now, stoppedAt: null,
     heartbeatAt: now, summary: "", recentFeedback: "", currentTalk: "",
-    talkSummary: "", topics: [], questions: [], issues: []
+    talkSummary: "", topics: [], questions: [], issues: [], keyPhrases: [],
+    talkMessageCount: 0, eventMessageCount: 0, irrelevantMessages: 0, eventIrrelevantMessages: 0,
+    talkIssues: [], eventIssues: [], talkQuestions: [], eventQuestions: []
   };
 }
 function activateVideo(videoId) {
@@ -56,6 +58,7 @@ function activateVideo(videoId) {
     writeJsonAtomic(HISTORY, []);
     const fresh = emptyVideoSummary(videoId, "running");
     writeJsonAtomic(DATA, fresh);
+    writeJsonAtomic(AUDIENCE, { videoId, agenda: [], agendaEnabled: false, samples: [] });
     return { changed: true, summary: fresh };
   }
   const now = new Date().toISOString();
@@ -115,13 +118,35 @@ app.post("/api/publish", (req, res) => {
   const videoId = d.videoId;
   if (!validVideoId(videoId)) return res.status(400).json({ error: "videoId inválido o ausente" });
   const cleanText = (v, max = 12000) => typeof v === "string" ? v.slice(0, max) : "";
-  const list = (v) => Array.isArray(v) ? v.slice(0, 12).map(x => cleanText(typeof x === "string" ? x : (x?.text || x?.question || ""), 500)).filter(Boolean) : [];
+  const textList = (v, maxItems = 12) => Array.isArray(v) ? v.slice(0, maxItems).map(x => cleanText(typeof x === "string" ? x : (x?.text || ""), 500)).filter(Boolean) : [];
+  const questionList = (v) => Array.isArray(v) ? v.slice(0, 12).map(x => ({
+    question: cleanText(typeof x === "string" ? x : (x?.question || x?.text || ""), 500),
+    count: Math.max(1, Number.parseInt(x?.count ?? 1, 10) || 1),
+    kind: x?.kind === "organizativa" ? "organizativa" : "contenido",
+    repetitive: x?.repetitive === true,
+    example: cleanText(x?.example, 240)
+  })).filter(x => x.question) : [];
+  const issueList = (v) => Array.isArray(v) ? v.slice(0, 12).map(x => ({
+    type: cleanText(typeof x === "string" ? x : (x?.type || x?.text || "Problema técnico"), 300),
+    count: Math.max(1, Number.parseInt(x?.count ?? 1, 10) || 1),
+    severity: ["baja","media","alta","crítica"].includes(x?.severity) ? x.severity : "media",
+    certainty: ["indicio","repetido","confirmado","claro"].includes(x?.certainty) ? x.certainty : "indicio",
+    example: cleanText(x?.example, 240), needsAction: x?.needsAction === true
+  })).filter(x => x.type) : [];
+  const number = v => Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.floor(Number(v)) : 0;
   const payload = {
     updatedAt: new Date().toISOString(), status: "running", videoId,
     summary: cleanText(d.summary, 5000) || "Sin resumen general disponible.",
-    recentFeedback: cleanText(d.recentFeedback, 12000),
-    currentTalk: cleanText(d.currentTalk, 300), talkSummary: cleanText(d.talkSummary, 5000),
-    topics: list(d.topics), questions: list(d.questions), issues: list(d.issues)
+    recentFeedback: cleanText(d.recentFeedback, 5000),
+    currentTalk: cleanText(d.currentTalk, 300), talkSummary: cleanText(d.talkSummary, 3000),
+    topics: textList(d.topics, 8), questions: questionList(d.questions), issues: issueList(d.issues),
+    keyPhrases: Array.isArray(d.keyPhrases) ? d.keyPhrases.slice(0, 3).map(x => ({text: cleanText(x?.text, 300), timestamp: cleanText(x?.timestamp, 30)})).filter(x => x.text) : [],
+    talkMessageCount: number(d.talkMessageCount), eventMessageCount: number(d.eventMessageCount),
+    irrelevantMessages: number(d.irrelevantMessages), eventIrrelevantMessages: number(d.eventIrrelevantMessages),
+    talkIssues: issueList(d.talkIssues), eventIssues: issueList(d.eventIssues),
+    talkQuestions: questionList(d.talkQuestions), eventQuestions: questionList(d.eventQuestions),
+    agenda: Array.isArray(d.agenda) ? d.agenda.slice(0, 30).map(x => ({time: cleanText(x?.time, 10), title: cleanText(x?.title, 300)})).filter(x => x.time && x.title) : [],
+    agendaEnabled: d.agendaEnabled === true
   };
   try {
     fs.mkdirSync(path.dirname(DATA), { recursive: true });
