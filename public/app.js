@@ -138,10 +138,41 @@ function addReportStats(container, report) {
   item.append(labelRow, number); stats.append(item); container.append(stats);
 }
 
+const ARGENTINA_TZ = "America/Argentina/Buenos_Aires";
+function normalizeSummary(value) {
+  if (Array.isArray(value)) return value.map(item => String(item ?? "").trim()).filter(Boolean).map(item => `- ${item}`).join("\n");
+  if (typeof value !== "string") return "";
+  const text = value.trim();
+  // Compatibility with reports already saved as Python repr, e.g. ['idea 1', 'idea 2'].
+  if (!(text.startsWith("[") && text.endsWith("]"))) return text;
+  const inner = text.slice(1, -1);
+  const items = [];
+  let i = 0;
+  while (i < inner.length) {
+    while (i < inner.length && /[\s,]/.test(inner[i])) i++;
+    if (i >= inner.length) break;
+    const quote = inner[i];
+    if (quote !== "'" && quote !== '"') return text;
+    i++;
+    let item = "", closed = false;
+    while (i < inner.length) {
+      const ch = inner[i++];
+      if (ch === "\\" && i < inner.length) { item += inner[i++]; continue; }
+      if (ch === quote) { closed = true; break; }
+      item += ch;
+    }
+    if (!closed) return text;
+    if (item.trim()) items.push(item.trim());
+    while (i < inner.length && /\s/.test(inner[i])) i++;
+    if (i < inner.length && inner[i] !== ",") return text;
+    if (inner[i] === ",") i++;
+  }
+  return items.length ? items.map(item => `- ${item}`).join("\n") : text;
+}
 function formatDate(value) {
   const date = value ? new Date(value) : null;
   if (!date || Number.isNaN(date.getTime())) return "Fecha no disponible";
-  return date.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "medium" });
+  return date.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "medium", timeZone: ARGENTINA_TZ }) + " (hora de Argentina)";
 }
 function getViewportAnchor() {
   const nodes = [...document.querySelectorAll(".report-entry")];
@@ -179,7 +210,7 @@ function renderReport(report, openIt = false) {
     const body = document.createElement("div"); body.className = "markdown-body";
     renderMarkdown(body, value, fallback); block.append(h, body); content.append(block);
   }
-  addBlock("Resumen general", report.summary, "No hay resumen general en este informe.");
+  addBlock("Resumen general", normalizeSummary(report.summary), "No hay resumen general en este informe.");
   if ((report.currentTalk || "").trim() || (report.talkSummary || "").trim()) {
     const block = document.createElement("section"); block.className = "report-block";
     const h = document.createElement("h4"); h.textContent = "Contexto de la charla";
@@ -252,14 +283,14 @@ function svgNode(name, attrs = {}) {
 function localClockMinutes(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: ARGENTINA_TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
   const hour = Number(parts.find(p => p.type === "hour")?.value);
   const minute = Number(parts.find(p => p.type === "minute")?.value);
   return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : null;
 }
 function shortTime(value) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString("es-AR", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit" });
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString("es-AR", { timeZone: ARGENTINA_TZ, hour: "2-digit", minute: "2-digit" });
 }
 function showAudiencePoint(item, anchor = null) {
   const detail = $("audience-point-detail");
@@ -269,7 +300,7 @@ function showAudiencePoint(item, anchor = null) {
   const count = document.createElement("strong");
   count.textContent = Number.isInteger(item.viewers) ? `${item.viewers.toLocaleString("es-AR")} espectadores simultáneos` : "Dato de espectadores no disponible";
   const time = document.createElement("span"); time.className = "point-detail-time";
-  time.textContent = new Date(item.timestamp).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "medium", timeZone: "Europe/Rome" }) + " (hora de Italia)";
+  time.textContent = new Date(item.timestamp).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "medium", timeZone: ARGENTINA_TZ }) + " (hora de Argentina)";
   const close = document.createElement("button"); close.type = "button"; close.className = "point-detail-close"; close.textContent = "×"; close.setAttribute("aria-label", "Cerrar detalle");
   close.addEventListener("click", () => { detail.hidden = true; });
   detail.append(label, count, time, close);
@@ -282,8 +313,8 @@ function showAudiencePoint(item, anchor = null) {
 }
 
 function renderAudience(data) {
-  const chart = $("audience-chart"), table = $("audience-agenda");
-  chart.replaceChildren(); table.replaceChildren();
+  const chart = $("audience-chart");
+  chart.replaceChildren();
   const samples = Array.isArray(data.samples) ? data.samples : [];
   const valid = samples.filter(x => Number.isInteger(x.viewers) && x.viewers >= 0).sort((a,b) => Date.parse(a.timestamp)-Date.parse(b.timestamp));
   const latestSample = samples.length ? samples[samples.length - 1] : null;
@@ -325,38 +356,7 @@ function renderAudience(data) {
     chart.append(svg);
   }
 
-  if (!data.agendaEnabled || !Array.isArray(data.agenda) || !data.agenda.length) {
-    const empty = document.createElement("p"); empty.className = "empty-state";
-    empty.textContent = "La tabla con las charlas programadas se habilita únicamente para el video oficial del congreso."; table.append(empty); return;
-  }
-  const tableEl = document.createElement("table"); tableEl.className = "audience-table";
-  const thead = document.createElement("thead"), headRow = document.createElement("tr");
-  ["Horario", "Charla programada", "Muestras", "Último dato", "Máximo observado"].forEach(label => { const th = document.createElement("th"); th.textContent = label; headRow.append(th); });
-  thead.append(headRow); tableEl.append(thead);
-  const tbody = document.createElement("tbody");
-  const agenda = data.agenda;
-  agenda.forEach((talk, index) => {
-    const startParts = String(talk.time || "").split(":").map(Number);
-    const startMinute = startParts.length === 2 ? startParts[0] * 60 + startParts[1] : null;
-    const next = agenda[index + 1];
-    const nextParts = next ? String(next.time || "").split(":").map(Number) : null;
-    const endMinute = nextParts?.length === 2 ? nextParts[0] * 60 + nextParts[1] : 24 * 60;
-    const slot = samples.filter(sample => {
-      const minute = localClockMinutes(sample.timestamp);
-      return minute !== null && startMinute !== null && minute >= startMinute && minute < endMinute;
-    });
-    const withValues = slot.filter(sample => Number.isInteger(sample.viewers) && sample.viewers >= 0);
-    const last = withValues.length ? withValues[withValues.length-1].viewers : null;
-    const peak = withValues.length ? Math.max(...withValues.map(sample => sample.viewers)) : null;
-    const row = document.createElement("tr");
-    const timeCell = document.createElement("td"); timeCell.textContent = talk.time || "—";
-    const titleCell = document.createElement("td"); titleCell.textContent = talk.title || "Charla sin título";
-    const sampleCell = document.createElement("td"); sampleCell.textContent = String(slot.length);
-    const lastCell = document.createElement("td"); lastCell.textContent = last === null ? "Sin datos" : last.toLocaleString("es-AR");
-    const peakCell = document.createElement("td"); peakCell.textContent = peak === null ? "Sin datos" : peak.toLocaleString("es-AR");
-    row.append(timeCell, titleCell, sampleCell, lastCell, peakCell); tbody.append(row);
-  });
-  tableEl.append(tbody); table.append(tableEl);
+
 }
 document.addEventListener("click", event => {
   const detail = $("audience-point-detail");
