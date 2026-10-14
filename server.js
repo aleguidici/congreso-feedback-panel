@@ -29,44 +29,114 @@ function isRealReport(report) {
   return Boolean(summary || report.recentFeedback || report.talkSummary)
     && !/^PRUEBA DE CONEXI[ÓO]N/i.test(summary);
 }
-app.post("/api/publish",(req,res)=>{
-  const auth=String(req.get("authorization")||"");
-  const expected="Bearer "+PUBLISH_TOKEN;
-  if(!eq(auth,expected)) return res.status(401).json({error:"No autorizado"});
-  const d=req.body||{};
-  const cleanText=(v,max=12000)=>typeof v==="string"?v.slice(0,max):"";
-  const list=(v)=>Array.isArray(v)?v.slice(0,12).map(x=>cleanText(typeof x==="string"?x:(x?.text||x?.question||""),500)).filter(Boolean):[];
-  const payload={
-    updatedAt:new Date().toISOString(),
-    status:"live",
-    summary:cleanText(d.summary,5000)||"Sin resumen general disponible.",
-    recentFeedback:cleanText(d.recentFeedback,12000),
-    currentTalk:cleanText(d.currentTalk,300),
-    talkSummary:cleanText(d.talkSummary,5000),
-    topics:list(d.topics),
-    questions:list(d.questions),
-    issues:list(d.issues)
+function publisherAuthorized(req, res) {
+  const auth = String(req.get("authorization") || "");
+  if (!eq(auth, "Bearer " + PUBLISH_TOKEN)) {
+    res.status(401).json({ error: "No autorizado" });
+    return false;
+  }
+  return true;
+}
+function validVideoId(value) {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{6,20}$/.test(value);
+}
+function emptyVideoSummary(videoId, status = "running") {
+  const now = new Date().toISOString();
+  return {
+    updatedAt: null, status, videoId, startedAt: now, stoppedAt: null,
+    heartbeatAt: now, summary: "", recentFeedback: "", currentTalk: "",
+    talkSummary: "", topics: [], questions: [], issues: []
+  };
+}
+function activateVideo(videoId) {
+  fs.mkdirSync(path.dirname(DATA), { recursive: true });
+  const current = readJsonFile(DATA, null);
+  if (!current || current.videoId !== videoId) {
+    // Legacy history has no reliable video ID, so discard it from the public timeline.
+    writeJsonAtomic(HISTORY, []);
+    const fresh = emptyVideoSummary(videoId, "running");
+    writeJsonAtomic(DATA, fresh);
+    return { changed: true, summary: fresh };
+  }
+  const now = new Date().toISOString();
+  const resumed = { ...current, status: "running", startedAt: now, stoppedAt: null, heartbeatAt: now, videoId };
+  writeJsonAtomic(DATA, resumed);
+  return { changed: false, summary: resumed };
+}
+app.post("/api/session/start", (req, res) => {
+  if (!publisherAuthorized(req, res)) return;
+  const videoId = req.body?.videoId;
+  if (!validVideoId(videoId)) return res.status(400).json({ error: "videoId inválido" });
+  try {
+    const result = activateVideo(videoId);
+    res.json({ ok: true, videoId, historyReset: result.changed, status: "running" });
+  } catch (e) {
+    console.error("No se pudo iniciar la sesión del panel:", e.message);
+    res.status(500).json({ error: "No se pudo iniciar la sesión" });
+  }
+});
+app.post("/api/session/stop", (req, res) => {
+  if (!publisherAuthorized(req, res)) return;
+  const videoId = req.body?.videoId;
+  if (!validVideoId(videoId)) return res.status(400).json({ error: "videoId inválido" });
+  try {
+    const current = readJsonFile(DATA, null);
+    if (!current || current.videoId !== videoId) {
+      return res.json({ ok: true, stopped: false, reason: "La sesión activa pertenece a otro video." });
+    }
+    const now = new Date().toISOString();
+    writeJsonAtomic(DATA, { ...current, status: "stopped", stoppedAt: now, heartbeatAt: now });
+    res.json({ ok: true, stopped: true, videoId, status: "stopped" });
+  } catch (e) {
+    console.error("No se pudo detener la sesión del panel:", e.message);
+    res.status(500).json({ error: "No se pudo detener la sesión" });
+  }
+});
+app.post("/api/session/heartbeat", (req, res) => {
+  if (!publisherAuthorized(req, res)) return;
+  const videoId = req.body?.videoId;
+  if (!validVideoId(videoId)) return res.status(400).json({ error: "videoId inválido" });
+  try {
+    const current = readJsonFile(DATA, null);
+    if (!current || current.videoId !== videoId || current.status !== "running") {
+      return res.json({ ok: true, refreshed: false });
+    }
+    const now = new Date().toISOString();
+    writeJsonAtomic(DATA, { ...current, heartbeatAt: now });
+    res.json({ ok: true, refreshed: true });
+  } catch (e) {
+    console.error("No se pudo actualizar el estado de la sesión:", e.message);
+    res.status(500).json({ error: "No se pudo actualizar el estado" });
+  }
+});
+app.post("/api/publish", (req, res) => {
+  if (!publisherAuthorized(req, res)) return;
+  const d = req.body || {};
+  const videoId = d.videoId;
+  if (!validVideoId(videoId)) return res.status(400).json({ error: "videoId inválido o ausente" });
+  const cleanText = (v, max = 12000) => typeof v === "string" ? v.slice(0, max) : "";
+  const list = (v) => Array.isArray(v) ? v.slice(0, 12).map(x => cleanText(typeof x === "string" ? x : (x?.text || x?.question || ""), 500)).filter(Boolean) : [];
+  const payload = {
+    updatedAt: new Date().toISOString(), status: "running", videoId,
+    summary: cleanText(d.summary, 5000) || "Sin resumen general disponible.",
+    recentFeedback: cleanText(d.recentFeedback, 12000),
+    currentTalk: cleanText(d.currentTalk, 300), talkSummary: cleanText(d.talkSummary, 5000),
+    topics: list(d.topics), questions: list(d.questions), issues: list(d.issues)
   };
   try {
     fs.mkdirSync(path.dirname(DATA), { recursive: true });
+    const current = readJsonFile(DATA, null);
+    if (!current || current.videoId !== videoId) activateVideo(videoId);
     let reports = readJsonFile(HISTORY, []);
     if (!Array.isArray(reports)) reports = [];
-
-    // Conserva el informe actual anterior si viene de una versión previa del panel.
-    const previous = readJsonFile(DATA, null);
-    if (isRealReport(previous) && !reports.some(r => r && r.updatedAt === previous.updatedAt)) {
-      reports.push(previous);
-    }
-
-    // Cada publicación se guarda como una entrada independiente; no sustituye informes anteriores.
-    reports = reports.filter(r => r && r.updatedAt !== payload.updatedAt);
+    // Only reports for the currently active video are retained in the public timeline.
+    reports = reports.filter(r => r && r.videoId === videoId && r.updatedAt !== payload.updatedAt);
     reports.push(payload);
     reports = reports.slice(-300);
-
     writeJsonAtomic(HISTORY, reports);
-    writeJsonAtomic(DATA, payload);
-    res.json({ ok: true, updatedAt: payload.updatedAt, savedReports: reports.length });
-  } catch(e) {
+    writeJsonAtomic(DATA, { ...payload, startedAt: readJsonFile(DATA, {}).startedAt || new Date().toISOString(), stoppedAt: null, heartbeatAt: new Date().toISOString() });
+    res.json({ ok: true, updatedAt: payload.updatedAt, videoId, savedReports: reports.length });
+  } catch (e) {
     for (const file of [DATA + ".tmp", HISTORY + ".tmp"]) {
       try { fs.unlinkSync(file); } catch {}
     }
@@ -74,20 +144,25 @@ app.post("/api/publish",(req,res)=>{
     res.status(500).json({ error: "No se pudo guardar el informe" });
   }
 });
-app.get("/api/public-summary",(req,res)=>{
-  res.set("Cache-Control","no-store");
-  res.json(readJsonFile(DATA, {updatedAt:null,status:"waiting",summary:"El análisis todavía no publicó resultados.",topics:[],questions:[],issues:[]}));
+app.get("/api/public-summary", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json(readJsonFile(DATA, { updatedAt: null, status: "waiting", videoId: null, summary: "El análisis todavía no publicó resultados.", topics: [], questions: [], issues: [] }));
 });
-app.get("/api/public-history",(req,res)=>{
-  res.set("Cache-Control","no-store");
+app.get("/api/public-history", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const current = readJsonFile(DATA, null);
+  const videoId = current?.videoId || null;
   let reports = readJsonFile(HISTORY, []);
   if (!Array.isArray(reports)) reports = [];
-  const current = readJsonFile(DATA, null);
-  if (isRealReport(current) && !reports.some(r => r && r.updatedAt === current.updatedAt)) reports.push(current);
-  reports = reports.filter(isRealReport)
-    .sort((a,b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt))
-    .slice(-300);
-  res.json({ reports });
+  if (videoId && isRealReport(current) && !reports.some(r => r && r.updatedAt === current.updatedAt && r.videoId === videoId)) reports.push(current);
+  reports = reports.filter(r => isRealReport(r) && videoId && r.videoId === videoId)
+    .sort((a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt)).slice(-300);
+  const status = current?.status || "waiting";
+  const heartbeatAt = current?.heartbeatAt || null;
+  // If Python disappears without running its shutdown handler, do not leave the panel live forever.
+  const heartbeatAge = heartbeatAt ? Date.now() - Date.parse(heartbeatAt) : Infinity;
+  const effectiveStatus = status === "running" && heartbeatAge > 180000 ? "stale" : status;
+  res.json({ reports, videoId, status: effectiveStatus, startedAt: current?.startedAt || null, stoppedAt: current?.stoppedAt || null });
 });
 app.get("/admin",(req,res)=>res.sendFile(path.join(__dirname,"public",sess(req)?"admin.html":"login.html")));
 app.post("/api/login",(req,res)=>{const ip=req.ip||"unknown",now=Date.now(),recent=(attempts.get(ip)||[]).filter(t=>now-t<15*60*1000);if(recent.length>=5)return res.status(429).json({error:"Demasiados intentos. Probá de nuevo en 15 minutos."});if(!eq(req.body?.username||"",USER)||!eq(req.body?.password||"",PASS)){recent.push(now);attempts.set(ip,recent);return res.status(401).json({error:"Usuario o contraseña incorrectos."})}attempts.delete(ip);res.json({ok:true,csrf:newSession(res)})});

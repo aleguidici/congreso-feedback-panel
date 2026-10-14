@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14243a">
+  <title>Estadísticas del Congreso</title>
+  <link rel="stylesheet" href="/style.css?v=5">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <div>
+        <p class="eyebrow">CONGRESO INTERNACIONAL</p>
+        <h1>Flipped Learning</h1>
+        <p class="header-subtitle">Síntesis de la conversación y la transmisión</p>
+      </div>
+      <span id="connection" class="pill" role="status">Conectando…</span>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="intro">
+      <p class="eyebrow">SEGUIMIENTO EN VIVO</p>
+      <h2>Historial de actualizaciones</h2>
+      <p class="muted">Los informes más recientes aparecen arriba. Las actualizaciones nuevas no interrumpen tu lectura: podés verlas cuando quieras.</p>
+      <div class="intro-meta">
+        <p id="updated" class="muted small">Esperando el primer informe…</p>
+        <a class="jump-link" href="#latest-report" id="latest-link">Ir al informe más reciente ↓</a>
+      </div>
+      <p id="report-count" class="count-label">Todavía no hay informes guardados.</p>
+    </section>
+    <section class="timeline-section" aria-labelledby="timeline-heading">
+      <div class="timeline-heading">
+        <div>
+          <p class="eyebrow">ORDEN CRONOLÓGICO</p>
+          <h3 id="timeline-heading">Informes del evento</h3>
+        </div>
+        <span class="timeline-note">Más recientes primero</span>
+      </div>
+      <div id="reports" class="reports" aria-live="off">
+        <div id="empty-state" class="empty-state">Esperando el primer análisis de Gemini…</div>
+      </div>
+    </section>
+    <footer>
+      <span>La página comprueba si hay novedades cada 10 segundos</span>
+      <a href="/admin">Administración</a>
+    </footer>
+  </main>
+  <button id="new-updates" class="new-updates" type="button" hidden>Hay nuevas actualizaciones ↓</button>
+  <script src="/app.js?v=5" defer></script>
+</body>
+</html>

@@ -3,6 +3,8 @@ const seenReports = new Set();
 let reportNumber = 0;
 let pendingUpdates = 0;
 let firstLoad = true;
+let activeVideoId = null;
+let videoInitialized = false;
 
 function appendInline(parent, text) {
   const pattern = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\*[^*\n]+\*|_[^_\n]+_)/g;
@@ -143,18 +145,19 @@ function renderReport(report, openIt = false) {
   details.addEventListener("toggle", () => { icon.textContent = details.open ? "−" : "＋"; });
   return article;
 }
-function updateMeta(reports) {
+function updateMeta(reports, status) {
   if (!reports.length) {
-    $("updated").textContent = "Esperando el primer informe…";
-    $("report-count").textContent = "Todavía no hay informes guardados."; return;
+    $("updated").textContent = status === "running" ? "Ejecución iniciada; esperando el primer informe…" :
+      status === "stopped" ? "Ejecución detenida." : "Esperando el primer informe…";
+    $("report-count").textContent = "Todavía no hay informes guardados para este video.";
+  } else {
+    const latest = reports[reports.length - 1];
+    $("updated").textContent = "Último informe recibido: " + formatDate(latest.updatedAt);
+    $("report-count").textContent = reports.length + (reports.length === 1 ? " informe conservado" : " informes conservados") + ".";
   }
-  const latest = reports[reports.length - 1];
-  $("updated").textContent = "Último informe recibido: " + formatDate(latest.updatedAt);
-  $("report-count").textContent = reports.length + (reports.length === 1 ? " informe conservado" : " informes conservados") + ".";
-  const lastReportTime = Date.parse(latest.updatedAt);
-  const hasRecentActivity = Number.isFinite(lastReportTime) && (Date.now() - lastReportTime) < 5 * 60 * 1000;
-  $("connection").textContent = hasRecentActivity ? "En vivo" : "Sin actividad reciente";
-  $("connection").classList.toggle("is-live", hasRecentActivity);
+  const labels = { running: "En vivo", stopped: "Detenido", stale: "Sin señal de Python", waiting: "Esperando ejecución" };
+  $("connection").textContent = labels[status] || "Estado desconocido";
+  $("connection").classList.toggle("is-live", status === "running");
 }
 function latestReportIsVisible() {
   const latest = document.querySelector(".report-entry");
@@ -176,21 +179,33 @@ async function refreshHistory() {
     if (!response.ok) throw new Error("No se pudo cargar el historial");
     const data = await response.json();
     const reports = Array.isArray(data.reports) ? data.reports : [];
-    const unseen = reports.filter(r => r && r.updatedAt && !seenReports.has(r.updatedAt));
+    const returnedVideoId = data.videoId || null;
     const container = $("reports");
 
+    if (!videoInitialized) {
+      activeVideoId = returnedVideoId;
+      videoInitialized = true;
+    } else if (returnedVideoId !== activeVideoId) {
+      // The server has switched videos: clear all client-side history and render only the new one.
+      activeVideoId = returnedVideoId;
+      container.replaceChildren();
+      seenReports.clear();
+      reportNumber = 0;
+      pendingUpdates = 0;
+      firstLoad = true;
+      updateNewButton();
+    }
+
+    const unseen = reports.filter(r => r && r.updatedAt && !seenReports.has(r.updatedAt));
     if (firstLoad) {
-      // La API devuelve cronológicamente; en pantalla queremos los más recientes primero.
       unseen.slice().reverse().forEach((report, index) => {
         const card = renderReport(report, index === 0);
         if (card) container.append(card);
       });
       firstLoad = false;
     } else if (unseen.length) {
-      // Guardamos el punto visible antes de insertar arriba y compensamos el desplazamiento.
       const anchor = getViewportAnchor();
       const oldTop = anchor ? anchor.top : null;
-      // Se insertan del más antiguo al más nuevo: el más nuevo termina arriba.
       unseen.forEach(report => {
         const card = renderReport(report, false);
         if (card) container.prepend(card);
@@ -209,12 +224,12 @@ async function refreshHistory() {
       pendingUpdates += unseen.length;
       updateNewButton();
     }
-    updateMeta(reports);
+    updateMeta(reports, data.status || "waiting");
     if (!container.querySelector(".report-entry")) {
       $("empty-state")?.remove();
       const empty = document.createElement("div");
       empty.id = "empty-state"; empty.className = "empty-state";
-      empty.textContent = "Esperando el primer análisis de Gemini…";
+      empty.textContent = data.status === "running" ? "Esperando el primer análisis de Gemini…" : "Todavía no hay informes para este video.";
       container.append(empty);
     } else {
       $("empty-state")?.remove();
