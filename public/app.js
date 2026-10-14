@@ -274,7 +274,7 @@ function renderAudience(data) {
     const max = Math.max(1, ...valid.map(x => x.viewers));
     const y = value => height - bottom - (value / max) * (height - top - bottom);
     const x = index => valid.length === 1 ? (left + width - right) / 2 : left + index * (width - left - right) / (valid.length - 1);
-    const svg = svgNode("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Evolución de espectadores simultáneos cada 15 minutos" });
+    const svg = svgNode("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Evolución de espectadores simultáneos cada 5 minutos" });
     [0, max / 2, max].forEach(value => {
       const yy = y(value);
       svg.append(svgNode("line", { x1: left, y1: yy, x2: width-right, y2: yy, stroke: "#dbe4ef", "stroke-width": 1 }));

@@ -169,6 +169,50 @@ app.post("/api/publish", (req, res) => {
     res.status(500).json({ error: "No se pudo guardar el informe" });
   }
 });
+app.post("/api/audience/publish", (req, res) => {
+  if (!publisherAuthorized(req, res)) return;
+  const d = req.body || {};
+  const videoId = d.videoId;
+  if (!validVideoId(videoId)) return res.status(400).json({ error: "videoId inválido o ausente" });
+  const timestamp = typeof d.timestamp === "string" && !Number.isNaN(Date.parse(d.timestamp))
+    ? new Date(d.timestamp).toISOString() : new Date().toISOString();
+  const viewers = d.viewers === null || d.viewers === undefined || d.viewers === ""
+    ? null : Number(d.viewers);
+  if (viewers !== null && (!Number.isInteger(viewers) || viewers < 0)) {
+    return res.status(400).json({ error: "viewers debe ser un entero no negativo o null" });
+  }
+  const cleanText = (v, max = 300) => typeof v === "string" ? v.slice(0, max) : "";
+  const agenda = Array.isArray(d.agenda) ? d.agenda.slice(0, 30).map(x => ({
+    time: cleanText(x?.time, 10), title: cleanText(x?.title, 300)
+  })).filter(x => x.time && x.title) : [];
+  try {
+    fs.mkdirSync(path.dirname(AUDIENCE), { recursive: true });
+    let data = readJsonFile(AUDIENCE, null);
+    if (!data || data.videoId !== videoId) data = { videoId, agenda: [], agendaEnabled: false, samples: [] };
+    const sample = { timestamp, viewers, currentTalk: cleanText(d.currentTalk, 300) || "Charla no identificada" };
+    let samples = Array.isArray(data.samples) ? data.samples.filter(x => x && x.timestamp !== timestamp) : [];
+    samples.push(sample);
+    samples.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+    data = {
+      videoId,
+      agenda: agenda.length ? agenda : (Array.isArray(data.agenda) ? data.agenda : []),
+      agendaEnabled: d.agendaEnabled === true,
+      samples: samples.slice(-2000),
+      updatedAt: timestamp
+    };
+    writeJsonAtomic(AUDIENCE, data);
+    res.json({ ok: true, videoId, viewers, samples: data.samples.length });
+  } catch (e) {
+    try { fs.unlinkSync(AUDIENCE + ".tmp"); } catch {}
+    console.error("No se pudo guardar la muestra de audiencia:", e.message);
+    res.status(500).json({ error: "No se pudo guardar la muestra de audiencia" });
+  }
+});
+app.get("/api/public-audience", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const data = readJsonFile(AUDIENCE, { videoId: null, agenda: [], agendaEnabled: false, samples: [] });
+  res.json(data && typeof data === "object" ? data : { videoId: null, agenda: [], agendaEnabled: false, samples: [] });
+});
 app.get("/api/public-summary", (req, res) => {
   res.set("Cache-Control", "no-store");
   res.json(readJsonFile(DATA, { updatedAt: null, status: "waiting", videoId: null, summary: "El análisis todavía no publicó resultados.", topics: [], questions: [], issues: [] }));
