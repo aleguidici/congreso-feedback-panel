@@ -127,11 +127,15 @@ function addKeyPhrases(container, phrases) {
 function addReportStats(container, report) {
   const stats = document.createElement("div"); stats.className = "report-stats";
   const item = document.createElement("div"); item.className = "report-stat";
+  const labelRow = document.createElement("div"); labelRow.className = "report-stat-label-row";
   const name = document.createElement("span"); name.textContent = "Mensajes acumulados de esta charla";
+  const info = document.createElement("button"); info.type = "button"; info.className = "info-tooltip";
+  info.textContent = "i"; info.setAttribute("aria-label", "Información sobre el contador");
+  info.title = "Cuenta los mensajes registrados desde el inicio identificado de esta charla; no solo los últimos 15 minutos.";
+  labelRow.append(name, info);
   const number = document.createElement("strong");
   number.textContent = Number.isFinite(Number(report.talkMessageCount)) ? Number(report.talkMessageCount).toLocaleString("es-AR") : "—";
-  const note = document.createElement("small"); note.textContent = "Desde el inicio identificado de la charla; no solo los últimos 15 minutos.";
-  item.append(name, number, note); stats.append(item); container.append(stats);
+  item.append(labelRow, number); stats.append(item); container.append(stats);
 }
 
 function formatDate(value) {
@@ -257,16 +261,24 @@ function shortTime(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString("es-AR", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit" });
 }
-function showAudiencePoint(item) {
+function showAudiencePoint(item, anchor = null) {
   const detail = $("audience-point-detail");
   if (!detail || !item) return;
   detail.replaceChildren();
-  const label = document.createElement("span"); label.className = "point-detail-label"; label.textContent = "Muestra seleccionada";
+  const label = document.createElement("span"); label.className = "point-detail-label"; label.textContent = "Muestra de audiencia";
   const count = document.createElement("strong");
   count.textContent = Number.isInteger(item.viewers) ? `${item.viewers.toLocaleString("es-AR")} espectadores simultáneos` : "Dato de espectadores no disponible";
   const time = document.createElement("span"); time.className = "point-detail-time";
   time.textContent = new Date(item.timestamp).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "medium", timeZone: "Europe/Rome" }) + " (hora de Italia)";
-  detail.append(label, count, time);
+  const close = document.createElement("button"); close.type = "button"; close.className = "point-detail-close"; close.textContent = "×"; close.setAttribute("aria-label", "Cerrar detalle");
+  close.addEventListener("click", () => { detail.hidden = true; });
+  detail.append(label, count, time, close);
+  detail.hidden = false;
+  let left = window.innerWidth / 2 - 150, top = window.innerHeight / 2 - 45;
+  const rect = anchor?.getBoundingClientRect?.();
+  if (rect) { left = rect.left + rect.width / 2 - 145; top = rect.top - 92; if (top < 8) top = rect.bottom + 12; }
+  detail.style.left = `${Math.max(8, Math.min(left, window.innerWidth - 308))}px`;
+  detail.style.top = `${Math.max(8, Math.min(top, window.innerHeight - 120))}px`;
 }
 
 function renderAudience(data) {
@@ -302,15 +314,12 @@ function renderAudience(data) {
       });
       const title = svgNode("title"); title.textContent = `${shortTime(item.timestamp)} · ${item.viewers.toLocaleString("es-AR")} espectadores`;
       circle.append(title);
-      circle.addEventListener("mouseenter", () => showAudiencePoint(item));
-      circle.addEventListener("focus", () => showAudiencePoint(item));
-      circle.addEventListener("click", () => showAudiencePoint(item));
+      circle.addEventListener("click", event => { event.stopPropagation(); showAudiencePoint(item, circle); });
       circle.addEventListener("keydown", event => {
-        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); showAudiencePoint(item); }
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); showAudiencePoint(item, circle); }
       });
       svg.append(circle);
     });
-    showAudiencePoint(valid[valid.length - 1]);
     const start = svgNode("text", { x: left, y: height-9, fill: "#a5a5bd", "font-size": 11 }); start.textContent = shortTime(valid[0].timestamp); svg.append(start);
     const end = svgNode("text", { x: width-right, y: height-9, "text-anchor": "end", fill: "#a5a5bd", "font-size": 11 }); end.textContent = shortTime(valid[valid.length-1].timestamp); svg.append(end);
     chart.append(svg);
@@ -349,6 +358,14 @@ function renderAudience(data) {
   });
   tableEl.append(tbody); table.append(tableEl);
 }
+document.addEventListener("click", event => {
+  const detail = $("audience-point-detail");
+  if (detail && !detail.hidden && !detail.contains(event.target) && !event.target.closest(".audience-point")) detail.hidden = true;
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") { const detail = $("audience-point-detail"); if (detail) detail.hidden = true; }
+});
+
 async function refreshAudience() {
   try {
     const response = await fetch("/api/public-audience?t=" + Date.now(), { cache: "no-store" });
@@ -426,17 +443,6 @@ async function refreshHistory() {
   }
 }
 $("new-updates").addEventListener("click", () => {
-  pendingUpdates = 0; updateNewButton();
-  const latest = document.querySelector(".report-entry");
-  if (!latest) return;
-  const details = latest.querySelector("details");
-  if (details) details.open = true;
-  const icon = latest.querySelector(".report-chevron");
-  if (icon) icon.textContent = "−";
-  window.scrollTo({ top: 0, behavior: "smooth" });
-});
-$("latest-link").addEventListener("click", event => {
-  event.preventDefault();
   pendingUpdates = 0; updateNewButton();
   const latest = document.querySelector(".report-entry");
   if (!latest) return;
