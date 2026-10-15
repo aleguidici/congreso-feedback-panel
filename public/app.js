@@ -314,6 +314,11 @@ function showAudiencePoint(item, anchor = null) {
 
 function renderAudience(data) {
   const chart = $("audience-chart");
+  // Si el visitante está viendo el extremo derecho, mantenerlo allí al actualizar.
+  // Si desplazó manualmente el gráfico hacia atrás, respetar su posición.
+  const seguirUltimaMuestra =
+    chart.scrollWidth === 0 ||
+    chart.scrollLeft + chart.clientWidth >= chart.scrollWidth - 40;
   chart.replaceChildren();
   const samples = Array.isArray(data.samples) ? data.samples : [];
   const valid = samples.filter(x => Number.isInteger(x.viewers) && x.viewers >= 0).sort((a,b) => Date.parse(a.timestamp)-Date.parse(b.timestamp));
@@ -324,11 +329,13 @@ function renderAudience(data) {
     empty.textContent = samples.length ? "YouTube todavía no facilitó una cifra de espectadores simultáneos. El gráfico se completará cuando el dato esté disponible." : "El gráfico está preparado; la primera muestra se registrará al iniciar el seguimiento.";
     chart.append(empty);
   } else {
-    const width = Math.max(600, valid.length * 62), height = 220, left = 48, right = 18, top = 18, bottom = 34;
+    // El ancho crece con las muestras, pero la altura y el tamaño tipográfico no.
+    // El contenedor permite desplazamiento horizontal para conservar la legibilidad.
+    const width = Math.max(600, chart.clientWidth - 20, valid.length * 62), height = 220, left = 48, right = 18, top = 18, bottom = 34;
     const max = Math.max(1, ...valid.map(x => x.viewers));
     const y = value => height - bottom - (value / max) * (height - top - bottom);
     const x = index => valid.length === 1 ? (left + width - right) / 2 : left + index * (width - left - right) / (valid.length - 1);
-    const svg = svgNode("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Evolución de espectadores simultáneos cada 5 minutos" });
+    const svg = svgNode("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Evolución de espectadores simultáneos cada 5 minutos" });
     [0, max / 2, max].forEach(value => {
       const yy = y(value);
       svg.append(svgNode("line", { x1: left, y1: yy, x2: width-right, y2: yy, stroke: "#303044", "stroke-width": 1 }));
@@ -354,6 +361,7 @@ function renderAudience(data) {
     const start = svgNode("text", { x: left, y: height-9, fill: "#a5a5bd", "font-size": 11 }); start.textContent = shortTime(valid[0].timestamp); svg.append(start);
     const end = svgNode("text", { x: width-right, y: height-9, "text-anchor": "end", fill: "#a5a5bd", "font-size": 11 }); end.textContent = shortTime(valid[valid.length-1].timestamp); svg.append(end);
     chart.append(svg);
+    if (seguirUltimaMuestra) chart.scrollLeft = chart.scrollWidth;
   }
 
 
